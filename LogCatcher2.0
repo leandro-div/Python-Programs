@@ -1,0 +1,372 @@
+class LogCatcher:
+
+    def __init__(self, testCase='Test case', sampleNumber='1', side='A', result='Pass', failedStep='1', devType=1,
+                 devices={}, checklist='Default'):
+        self.testCase = testCase
+        self.sampleNumber = sampleNumber
+        self.side = side
+        self.result = result
+        self.failedStep = failedStep
+        self.devType = devType
+        self.devices = devices
+        self.checklist = checklist
+
+    def adb_root(self, device=''):
+        print('Rooting Device')
+        if len(self.devices) > 1:
+            self.execute_command('adb -s ' + device + ' root')
+        else:
+            self.execute_command('adb root')
+
+    def adb_devices(self, device):
+        self.execute_command('adb devices')
+
+    def cls(self):
+        self.execute_command('cls')
+
+    def file_name_str(self):
+        if self.devType == 1:
+            return '"#' + self.sampleNumber + ' ' + self.side + ' ' + self.testCase + ' ' + self.result + '"'
+        else:
+            return '"REF #' + self.sampleNumber + ' ' + self.side + ' ' + self.testCase + ' ' + self.result + '"'
+
+    def wait(self, device=''):
+        print("Waiting for Device " + device)
+        if len(self.devices) > 1:
+            self.execute_command('adb -s ' + device + ' wait-for-device')
+        else:
+            self.execute_command('adb wait-for-device')
+
+    def timeout(self, time='5'):
+        command = 'timeout /t ' + time
+        self.execute_command(str(command))
+
+    def pull_command_str(self):
+        if self.devType == 1:
+            return 'adb pull /sdcard/DMLog ' + self.file_name_str()
+        else:
+            return 'adb pull /sdcard/log ' + self.file_name_str()
+
+    def pull_wifi_command_str(self):
+        return '/data/vendor/log/wifi ' + self.file_name_str()
+
+    def pull_sqe_auto_command_str(self, date):
+        return 'adb pull /sdcard/log/SqeAutoRegr/' + date + ' ' + self.file_name_str()
+
+    def pull(self, path):
+        print('Pulling file\n ' + path)
+        self.execute_command(path)
+
+    def zip_file_name_str(self):
+        return '"C:\Program Files\\7-Zip\\7z.exe" a ' + self.file_name_str() + '.7z ' + self.file_name_str()
+
+    def zip(self):
+        print('Compacting Files...')
+        self.execute_command(self.zip_file_name_str())
+
+    def remove_command_str(self):
+        return 'adb shell rm -rf /sdcard/DMLog'
+
+    def remove_ref_ap_str(self):
+        return 'adb shell rm -rf /sdcard/log/ap_silentlog'
+
+    def remove_ref_cp_str(self):
+        return 'adb shell rm -rf /sdcard/log/cp'
+
+    def remove_ref_log_str(self):
+        return 'adb shell rm -rf /sdcard/log'
+
+    def remove_wifi_command_str(self):
+        return 'adb shell rm -rf /data/vendor/log/wifi'
+
+    def remove_sqe_auto_command_str(self, date):
+        return 'adb shell rm -rf /sdcard/log/SqeAutoRegr/' + date
+
+    def remove(self, path):
+        print('Clearing files\n' + path)
+        self.execute_command(path)
+
+    def folder_name_str(self):
+        if self.result.lower() == 'pass':
+            return self.testCase + " Pass"
+        else:
+            return self.testCase + ' Fail at step ' + self.failedStep
+
+    def create_folder(self):
+        print('Creating Folder...')
+        command = 'md "' + self.folder_name_str() + '"'
+        self.execute_command(command)
+
+    def redefine_wifi_folder(self):
+        print('Redefining Wifi Folder...')
+        self.execute_command('adb shell mkdir /data/vendor/log/wifi')
+
+    def move_command_str(self):
+        return 'move ' + self.file_name_str() + '.7z "' + self.folder_name_str() + '"'
+
+    def move_txt_command_str(self):
+        return 'move "Test Result.txt" ' + '"' + self.folder_name_str() + '"'
+
+    def open_txt_file_str(self):
+        return '"' + self.folder_name_str() + '"\\"Test Result.txt"'
+
+    def open_txt_command(self):
+        print('Opening .txt file...')
+        self.execute_command(self.open_txt_file_str())
+
+    def move(self, path):
+        print('Moving files to folders...')
+        self.execute_command(path)
+
+    def delete_folder_str(self):
+        return 'rmdir /q /s ' + self.file_name_str()
+
+    def delete_folder(self):
+        print('Deleting folders...')
+        self.execute_command(self.delete_folder_str())
+
+    def create_txt_file(self):
+        print('Creating .txt file...')
+        if self.result.lower() == 'pass':
+            t = open("Test Result.txt", "w+")
+            t.write('Test Result: PASS\nTest Steps: \n')
+            t.write(self.export_csv_file())
+            t.close()
+        else:
+            t = open("Test Result.txt", "w+")
+            t.write("Test Result: Fail\nFail Step: " + self.failedStep + "\nComment:\n\nTest Steps:\n")
+            t.write(self.export_csv_file())
+            t.close()
+
+    def export_csv_file(self):
+        import csv
+        print('Reading CSV File...')
+        with open('csv files\\' + self.checklist + '.csv') as csvfile:
+            readCSV = csv.reader(csvfile, delimiter=';')
+            testCases = []
+            testProcedures = []
+            for row in readCSV:
+                testCase = row[0]
+                testProcedure = row[1]
+                testCases.append(testCase)
+                testProcedures.append(testProcedure)
+
+            try:
+                codex = testCases.index(self.testCase)
+            except:
+                codex = 1
+
+            return testProcedures[codex]
+
+    def set_checklist_name(self):
+        self.cls()
+        print('Checklists: ')
+        print('1. Mandatory Report')
+        print('2. Round Test')
+        print('0. Another')
+
+        checklist_list = {'1': 'MandatoryReport', '2': 'RoundTestReport', '0': 'Default'}
+        option = 99
+        while option < 0 or option > 2:
+            option = input('Select your option: ')
+            try:
+                option = int(option)
+            except:
+                option = 99
+
+        self.checklist = checklist_list[str(option)]
+        print('Checklist Defined.')
+        self.timeout('3')
+
+    def set_theme(self):
+        self.cls()
+        print('Select Theme: ')
+        print('0. Default')
+        print('1. Dark Theme ')
+        print('2. Light Theme')
+        print('3. Hacker Theme')
+        op = 99
+        while op < 0 or op > 3:
+            op = input('Select your theme: ')
+            try:
+                op = int(op)
+            except:
+                op = 99
+        dic = {0: '', 1: '0F', 2: 'F0', 3: '02'}
+        self.execute_command('color ' + dic[op])
+
+    def execute_command(self, command):
+        import subprocess
+        subprocess.Popen(command, shell=True).communicate()
+
+    def extract_log_ref(self):
+        self.wait()
+        self.pull(self.pull_command_str())
+        self.zip()
+        self.remove(self.remove_ref_ap_str())
+        self.remove(self.remove_ref_cp_str())
+        self.remove(self.remove_ref_log_str())
+        self.create_folder()
+        self.move(self.move_command_str())
+        self.delete_folder()
+
+    def extract_log_dut(self, sqeLog=False):
+        self.wait()
+        self.adb_root()
+        self.pull(self.pull_command_str())
+        self.pull(self.pull_wifi_command_str())
+        if sqeLog == True:
+            date = str(input('Test Date: (YYYYMMDD) '))
+            self.pull(self.pull_sqe_auto_command_str(date))
+        self.zip()
+        self.remove(self.remove_command_str())
+        self.remove(self.remove_wifi_command_str())
+        self.redefine_wifi_folder()
+        if sqeLog == True:
+            self.pull(self.remove_sqe_auto_command_str(date))
+        self.create_folder()
+        self.move(self.move_command_str())
+        self.delete_folder()
+
+    def create_test_result_file(self):
+        self.create_txt_file()
+        self.move(self.move_txt_command_str())
+        self.open_txt_command()
+
+    def get_devices(self):
+        import subprocess
+        output = subprocess.Popen('adb devices', shell=True, stdout=subprocess.PIPE).communicate()[0]
+        output = str(output).split('attached')[1]
+        output = output.split('device')[0]
+        output = output.replace("\\n", "").replace("\\r", "")
+        output = output.replace("\\t", "")
+        return output
+
+    def register_device(self):
+        while True:
+            deviceNumber = input('Device Number: ')
+            self.wait()
+            self.devices.update({deviceNumber: self.get_devices()})
+            print('Device successfully registered.')
+            if input('Is there another device? (Y/N): ').lower() == 'n':
+                break
+
+    def show_registered_devices(self):
+        print(self.devices)
+
+
+def get_info(option=1, logcatcher=LogCatcher()):
+    while True:
+        logcatcher.testCase = str(input('Test Case: '))
+        if len(logcatcher.testCase) < 90:
+            break
+        print('Maximum test case name should be 90 characters.')
+
+    if option % 2 == 0:
+        logcatcher.result = 'FAIL'
+        logcatcher.failedStep = str(input('Failed Step: '))
+    else:
+        logcatcher.result = "PASS"
+
+    while True:
+        while True:
+            logcatcher.sampleNumber = str(input('Sample Number: '))
+            try:
+                t = int(logcatcher.sampleNumber)
+                break
+            except:
+                print('Invalid Entry')
+
+        while True:
+            logcatcher.side = input('Sample Side: ').upper()
+            if len(logcatcher.side) == 1:
+                try:
+                    logcatcher.side = int(logcatcher.side)
+                    print('Invalid Entry')
+                except:
+                    break
+            else:
+                print('Invalid Entry')
+
+        if option == 1 or option == 2:
+            logcatcher.devType = 1
+            logcatcher.extract_log_dut()
+        if option == 3 or option == 4:
+            logcatcher.devType = 2
+            logcatcher.extract_log_ref()
+        if option == 5 or option == 6:
+            logcatcher.devType = 1
+            logcatcher.extract_log_dut(True)
+
+        looper = ''
+        while looper != 'y' and looper != 'n':
+            looper = input("Is there any other sample? (Y/N): ").lower()
+        if looper == 'n':
+            logcatcher.create_test_result_file()
+            logcatcher.cls()
+            break
+
+import requests as rq
+
+while True:
+    try:
+        resp = rq.get('http://worldclockapi.com/api/json/est/now')
+        break
+    except:
+        print('Connect to the internet')
+        input('Try again: ')
+info = resp.json()
+today = info['currentDateTime']
+today = today[:10]
+expireDate = '2020-04-01'
+if today < expireDate:
+    logcatcher = LogCatcher()
+    logcatcher.execute_command("title LogCatcher 2.0")
+    while True:
+        logcatcher.cls()
+
+        print('    __                ______      __       __                 ___    ____ ')
+        print('   / /   ____  ____ _/ ____/___ _/ /______/ /_  ___  _____   |__ \  / __ \\')
+        print('  / /   / __ \/ __ `/ /   / __ `/ __/ ___/ __ \/ _ \/ ___/   __/ / / / / /')
+        print(' / /___/ /_/ / /_/ / /___/ /_/ / /_/ /__/ / / /  __/ /      / __/_/ /_/ / ')
+        print('/_____/\____/\__, /\____/\__,_/\__/\___/_/ /_/\___/_/      /____(_)____/  ')
+        print('            /____/                                                        ')
+        print('This software is intellectual property of MOTS©\n')
+        print('Support or sugestions:\nleandro.vieira@motslatam.com\nwagner.marcelino@motslatam.com')
+        print('\nVersion 2.0.3')
+        print('--------------------------------------------------------------------------\n')
+
+        print('1. Extract PASS')
+        print('2. Extract FAIL')
+        print('3. Extract Reference Pass')
+        print('4. Extract Reference FAIL')
+        print('5. Extract SQE Auto Log Pass')
+        print('6. Extract SQE Auto Log Fail')
+        print('7. Select Checklist')
+        print('8. Themes')
+        print('0. Exit LogCatcher')
+        print('')
+
+        option = 99
+        while option > 8 or option < 0:
+            option = input('Select your option: ')
+            try:
+                option = int(option)
+            except:
+                option = 99
+
+        if option == 0:
+            break
+
+        elif option == 7:
+            logcatcher.set_checklist_name()
+
+        elif option == 8:
+            logcatcher.set_theme()
+        else:
+            get_info(option, logcatcher)
+else:
+    print('Get in contact with:\nleandro.vieira@motslatam.com\nwagner.marcelino@motsltam.com')
+    ex = LogCatcher()
+    ex.execute_command('start https://http.cat/426')
+    ex = 0
